@@ -96,7 +96,7 @@
                 helper.notifyAdapterDataSetChanged(list);
             }
 
-![](https://github.com/cnmen/Adapter/screenshot/preview/screenshot_common.png)
+![](https://github.com/cnmen/Adapter/blob/master/screenshot/Screenshot_common.png)
 ###普通RecyclerView示例：
         @ContentView(R.layout.activity_recycler)
         public class RecyclerActivity extends BaseRecyclerView {
@@ -193,7 +193,7 @@
             }
         }
 
-![](https://github.com/cnmen/Adapter/screenshot/preview/screenshot_nesting.png)
+![](https://github.com/cnmen/Adapter/blob/master/screenshot/Screenshot_nesting.png)
 ###嵌套RecyclerView示例：
         @ContentView(R.layout.activity_nesting)
         public class NestingActivity extends BaseRecyclerView {
@@ -270,7 +270,7 @@
             }
         }
 
-![](https://github.com/cnmen/Adapter/screenshot/preview/screenshot_multi.png)
+![](https://github.com/cnmen/Adapter/blob/master/screenshot/Screenshot_multi.png)
 ###复杂RecyclerView示例：
         @ContentView(R.layout.activity_multi_item)
         public class MultiItemActivity extends BaseRecyclerView {
