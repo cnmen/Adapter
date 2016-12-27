@@ -7,8 +7,8 @@
 
 ##Adapter适配器框架用法如下，以RecyclerView为例：
 
-###父类BaseRViewActivity说明：
-        public abstract class BaseRViewActivity extends AppCompatActivity implements RViewCreate, RViewHelper.OnRecycleViewHelperListener {
+###父类BaseRecyclerView说明：
+        public abstract class BaseRecyclerView extends BaseActivity implements RViewCreate, RViewHelper.OnRecycleViewHelperListener {
 
             protected RViewHelper helper;
 
@@ -18,10 +18,28 @@
                 helper = RViewFactory.createRecycleViewHelper(this, this);
             }
 
+            /** 加载更多 */
+            @Override
+            public void onLoadMore() {
+
+            }
+
+            /** 无更多数据 */
+            @Override
+            public void onNoMoreData() {
+                ToastUtils.show(this, "无更多数据");
+            }
+
             /** 创建SwipeRefresh下拉 */
             @Override
             public SwipeRefreshLayout createSwipeRefresh() {
                 return (SwipeRefreshLayout) findViewById(R.id.swipeRefreshLayout);
+            }
+
+            /** SwipeRefresh下拉颜色 */
+            @Override
+            public int[] colorRes() {
+                return new int[] {R.color.green_dark, R.color.blue_dark, R.color.orange_dark};
             }
 
             /** 创建RecycleView */
@@ -32,7 +50,7 @@
 
             /** 创建RecycleView */
             @Override
-            public LinearLayoutManager createLayoutManager() {
+            public RecyclerView.LayoutManager createLayoutManager() {
                 return new LinearLayoutManager(this);
             }
 
@@ -51,19 +69,13 @@
             /** 创建加载更多布局 */
             @Override
             public int createLoadMoreView() {
-                return R.layout.default_loading;
+                return R.layout.load_more;
             }
 
             /** 开始页码 */
             @Override
             public int startPageNumber() {
-                return 1;
-            }
-
-            /** 最后一页少于多少条数据显示无更多数据 */
-            @Override
-            public int rowsPageNumber() {
-                return 10;
+                return Cons.PAGE_NUMBER;
             }
 
             /** 是否支持分页 */
@@ -72,95 +84,246 @@
                 return false;
             }
 
-            /** 加载更多 */
+            /** 最后一页少于多少条数据显示无更多数据 */
             @Override
-            public void onLoadMore() {
-            }
-
-            /** 无更多数据 */
-            @Override
-            public void onNoMoreData() {
-                Toast.makeText(this, "没有更多数据啦", Toast.LENGTH_SHORT).show();
+            public int rowsPageNumber() {
+                return Cons.PAGE_ROWS;
             }
 
             /** 刷新适配器 */
             @Override
-            protected void notifyAdapterDataSetChanged(List data) {
-                helper.notifyAdapterDataSetChanged(data);
+            public void notifyAdapterDataSetChanged(List list) {
+                helper.notifyAdapterDataSetChanged(list);
             }
-        }
 
-###子类Activity示例：
-        public class RecyclerViewActivity extends BaseRViewActivity {
+![](https://github.com/cnmen/Adapter/screenshot/preview/screenshot_common.png)
+###普通RecyclerView示例：
+        @ContentView(R.layout.activity_recycler)
+        public class RecyclerActivity extends BaseRecyclerView {
 
-            private List<String> mDatas = new ArrayList<>();
-            private RCommonAdapter<String> mAdapter;
+            private ActionServices service;
+            private RCommonAdapter<OrderEntity> adapter;
 
             @Override
             protected void onCreate(Bundle savedInstanceState) {
                 super.onCreate(savedInstanceState);
-                setContentView(R.layout.activity_recyclerview);
-                initDatas();
+                service = retrofit.createService(ActionServices.class);
+                initListener();
+                postOrderList();
+            }
 
-                mAdapter.setOnItemClickListener(new RCommonAdapter.OnItemClickListener() {
+            private void initListener() {
+                adapter.setOnItemClickListener(new RCommonAdapter.OnItemClickListener<OrderEntity>() {
                     @Override
-                    public void onItemClick(View view, RecyclerView.ViewHolder holder, int position) {
-                        Toast.makeText(RecyclerViewActivity.this, mAdapter.getItem(position), Toast.LENGTH_SHORT).show();
+                    public void onItemClick(View view, OrderEntity orderEntity, int position) {
+                        if (orderEntity != null) ToastUtils.show(app, "onItemClick = " + orderEntity.getPatientName());
                     }
                 });
 
-                mAdapter.setOnItemLongClickListener(new RCommonAdapter.OnItemLongClickListener() {
+                adapter.setOnItemLongClickListener(new RCommonAdapter.OnItemLongClickListener<OrderEntity>() {
                     @Override
-                    public boolean onItemLongClick(View view, RecyclerView.ViewHolder holder, int position) {
-                        Toast.makeText(RecyclerViewActivity.this, "onItemLongClick = " + position, Toast.LENGTH_SHORT).show();
+                    public boolean onItemLongClick(View view, OrderEntity orderEntity, int position) {
+                        ToastUtils.show(app, "onItemLongClick = " + position);
                         return false;
                     }
                 });
             }
 
-            /** 模拟数据 */
-            private void initDatas() {
-                if (mDatas != null && mDatas.size() != 0) {
-                    mDatas.clear();
-                }
-                for (int i = 'A'; i <= 'z'; i++) {
-                    if (mDatas != null) mDatas.add((char) i + "");
-                }
-                notifyAdapterDataSetChanged(mDatas);
+            private void postOrderList() {
+                Subscription s = NestingHelper.Builder
+                        .builder(service.login(getLoginParamas()), service.orderList(null))
+                        .nestingCall(new NestingFunction<BaseBean<UserInfo>, BaseBean<PageEntity<OrderEntity>>>() {
+                            @Override
+                            public Observable<BaseBean<PageEntity<OrderEntity>>> call(BaseBean<UserInfo> userInfo) {
+                                PreferencesUtils.putString(app, Cons.AUTH_TOKEN, userInfo.getData().getSessionKey());
+                                return service.orderList(getOrderParamas(helper.getCurrentPageNum()));
+                            }
+                        })
+                        .callback(new HttpCallback<BaseBean<PageEntity<OrderEntity>>>() {
+                            @Override
+                            public void onSuccess(BaseBean<PageEntity<OrderEntity>> order) {
+                                notifyAdapterDataSetChanged(order.getData().getResult());
+                            }
+                        })
+                        .toSubscribe();
+                addSubscription(s);
+            }
+
+            @Override
+            public boolean isSupportPaging() {
+                return true;
+            }
+
+            @Override
+            public void onRefresh() {
+                postOrderList();
+            }
+
+            @Override
+            public void onLoadMore() {
+                postOrderList();
             }
 
             @Override
             public RMultiItemTypeAdapter createRecycleViewAdapter() {
-                mAdapter = new RCommonAdapter<String>(R.layout.item_list, mDatas) {
-                    @Override
-                    protected void convert(RViewHolder holder, String s, int position) {
-                        holder.setText(R.id.id_item_list_title, s + " : " + holder.getAdapterPosition());
-                        // 可做条目控件点击事件
-                    }
-                };
-                return mAdapter;
+                adapter = new CommonAdapter(R.layout.order_item, null);
+                return adapter;
             }
 
             @Override
-            public void onRefresh() { // 下拉刷新
-                initDatas();
+            public RecyclerView.ItemDecoration createItemDecoration() {
+                return null;
+            }
+
+            private Map<String, String> getLoginParamas() {
+                Map<String, String> loginParams = new HashMap<>();
+                loginParams.put("mobileNo", "187xxxx9257");
+                loginParams.put("password", MD5Utils.encode("123456"));
+                return ParamsUtils.checkParams(loginParams);
+            }
+
+            private Map<String, String> getOrderParamas(int page) {
+                Map<String, String> orderParams = new HashMap<>();
+                orderParams.put("nurseId", "153"); // 87不分页
+                orderParams.put("category", "2");
+                orderParams.put("page", String.valueOf(page));
+                orderParams.put("rows", String.valueOf(Cons.PAGE_ROWS));
+                orderParams.put("sessionKey", PreferencesUtils.getString(this, Cons.AUTH_TOKEN));
+                return ParamsUtils.checkParams(orderParams);
+            }
+        }
+
+![](https://github.com/cnmen/Adapter/screenshot/preview/screenshot_nesting.png)
+###嵌套RecyclerView示例：
+        @ContentView(R.layout.activity_nesting)
+        public class NestingActivity extends BaseRecyclerView {
+
+            private ActionServices service;
+
+            @Override
+            protected void onCreate(Bundle savedInstanceState) {
+                super.onCreate(savedInstanceState);
+                service = retrofit.createService(ActionServices.class);
+                postPicc();
+            }
+
+            private void postPicc() {
+                Subscription s = NestingHelper.Builder
+                        .builder(service.login(getLoginParamas()), service.piccList(null))
+                        .nestingCall(new NestingFunction<BaseBean<UserInfo>, BaseBean<PageEntity<PiccEntity>>>() {
+                            @Override
+                            public Observable<BaseBean<PageEntity<PiccEntity>>> call(BaseBean<UserInfo> userInfo) {
+                                String sessionKey = userInfo.getData().getSessionKey();
+                                return service.piccList(getPiccParamas(helper.getCurrentPageNum(), sessionKey));
+                            }
+                        })
+                        .callback(new HttpCallback<BaseBean<PageEntity<PiccEntity>>>() {
+                            @Override
+                            public void onSuccess(BaseBean<PageEntity<PiccEntity>> picc) {
+                                List<PiccEntity> list = PiccIndexBiz.convertToItemData(picc.getData().getResult());
+                                notifyAdapterDataSetChanged(list);
+                            }
+                        })
+                        .toSubscribe();
+                addSubscription(s);
+            }
+
+            private Map<String, String> getLoginParamas() {
+                Map<String, String> loginParams = new HashMap<>();
+                loginParams.put("mobileNo", "187xxxx9257");
+                loginParams.put("password", MD5Utils.encode("123456"));
+                return ParamsUtils.checkParams(loginParams);
+            }
+
+            private Map<String, String> getPiccParamas(int page, String sessionKey) {
+                Map<String, String> piccParams = new HashMap<>();
+                piccParams.put("nurseId", "87");
+                piccParams.put("page", String.valueOf(page));
+                piccParams.put("rows", String.valueOf(Cons.PAGE_ROWS));
+                piccParams.put("sessionKey", sessionKey);
+                return ParamsUtils.checkParams(piccParams);
             }
 
             @Override
-            public void onLoadMore() { // 加载更多，模拟需求
-                new Handler().postDelayed(new Runnable() {
-                    @Override
-                    public void run() {
-                        for (int i = 0; i < 9; i++) {
-                            mDatas.add("Add:" + i);
-                        }
-                        helper.getLoadMoreWrapper().notifyDataSetChanged();
-                    }
-                }, 1000);
+            public RecyclerView.ItemDecoration createItemDecoration() {
+                return null;
             }
 
             @Override
-            public boolean isSupportPaging() { // 支持分页
+            public RMultiItemTypeAdapter createRecycleViewAdapter() {
+                return new NestingAdapter(null);
+            }
+
+            @Override
+            public void onRefresh() {
+                postPicc();
+            }
+
+            @Override
+            public void onLoadMore() {
+                postPicc();
+            }
+
+            @Override
+            public boolean isSupportPaging() {
                 return true;
+            }
+        }
+
+![](https://github.com/cnmen/Adapter/screenshot/preview/screenshot_multi.png)
+###复杂RecyclerView示例：
+        @ContentView(R.layout.activity_multi_item)
+        public class MultiItemActivity extends BaseRecyclerView {
+
+            private ActionServices service;
+
+            @Override
+            protected void onCreate(Bundle savedInstanceState) {
+                super.onCreate(savedInstanceState);
+                service = retrofit.createService(ActionServices.class);
+                postPatient();
+            }
+
+            private void postPatient() {
+                Subscription s = NestingHelper.Builder
+                        .builder(service.login(getLoginParamas()), service.woundList(null, null))
+                        .nestingCall(new NestingFunction<BaseBean<UserInfo>, BaseListBean<PatientEntity>>() {
+                            @Override
+                            public Observable<BaseListBean<PatientEntity>> call(BaseBean<UserInfo> userInfo) {
+                                String sessionKey = userInfo.getData().getSessionKey();
+                                return service.woundList("153", sessionKey);
+                            }
+                        })
+                        .callback(new HttpCallback<BaseListBean<PatientEntity>>() {
+                            @Override
+                            public void onSuccess(BaseListBean<PatientEntity> patient) {
+                                List<PatientEntity> list = WoundPatientBiz.convertToItemData(patient.getData());
+                                notifyAdapterDataSetChanged(list);
+                            }
+                        })
+                        .toSubscribe();
+                addSubscription(s);
+            }
+
+            private Map<String, String> getLoginParamas() {
+                Map<String, String> loginParams = new HashMap<>();
+                loginParams.put("mobileNo", "187xxxx9257");
+                loginParams.put("password", MD5Utils.encode("123456"));
+                return ParamsUtils.checkParams(loginParams);
+            }
+
+            @Override
+            public RecyclerView.ItemDecoration createItemDecoration() {
+                return null;
+            }
+
+            @Override
+            public RMultiItemTypeAdapter createRecycleViewAdapter() {
+                return new MultiAdapter(null);
+            }
+
+            @Override
+            public void onRefresh() {
+                postPatient();
             }
         }
