@@ -1,13 +1,13 @@
 # Adapter
-##多功能适配器框架
+## 多功能适配器框架
 
 版本：2.3.5<br>
 作者：西门提督<br>
 日期：2016-12-15
 
-##Adapter适配器框架用法如下，以RecyclerView为例：
+## Adapter适配器框架用法如下，以RecyclerView为例：
 
-###父类BaseRecyclerView说明：
+### 父类BaseRecyclerView说明：
         public abstract class BaseRecyclerView extends BaseActivity implements RViewCreate, RViewHelper.OnRecycleViewHelperListener {
 
             protected RViewHelper helper;
@@ -97,7 +97,7 @@
             }
 
 ![](https://github.com/cnmen/Adapter/blob/master/screenshot/Screenshot_common.png)
-###普通RecyclerView示例：
+### 普通RecyclerView示例：
         @ContentView(R.layout.activity_recycler)
         public class RecyclerActivity extends BaseRecyclerView {
 
@@ -194,7 +194,7 @@
         }
 
 ![](https://github.com/cnmen/Adapter/blob/master/screenshot/Screenshot_nesting.png)
-###嵌套RecyclerView示例：
+### 嵌套RecyclerView示例：
         @ContentView(R.layout.activity_nesting)
         public class NestingActivity extends BaseRecyclerView {
 
@@ -271,7 +271,7 @@
         }
 
 ![](https://github.com/cnmen/Adapter/blob/master/screenshot/Screenshot_multi.png)
-###复杂RecyclerView示例：
+### 复杂RecyclerView示例：
         @ContentView(R.layout.activity_multi_item)
         public class MultiItemActivity extends BaseRecyclerView {
 
